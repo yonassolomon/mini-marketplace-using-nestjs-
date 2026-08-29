@@ -1,0 +1,54 @@
+// ============================================================
+// Prisma schema — the SINGLE SOURCE OF TRUTH for our database
+//
+// 1. Purpose: defines the database models (User, Product) and
+//    the connection details. Prisma CLI reads this file to
+//    create migrations and generate the type-safe client.
+// 2. Called by: the Prisma CLI (npx prisma migrate/generate)
+//    and by nothing at runtime.
+// 3. Calls: the PostgreSQL database (to create tables).
+// 4. Communication: Database query (only via the CLI).
+// 5. Why it exists: Prisma is schema-first. You describe the
+//    data, and Prisma turns it into SQL migrations + TypeScript
+//    types that your service code imports.
+// ============================================================
+
+// "generator" tells Prisma which language client to generate.
+generator client {
+  provider = "prisma-client-js"
+}
+
+// "datasource" tells Prisma which database to talk to.
+// The URL comes from the .env file (DATABASE_URL).
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// A user is a person in the marketplace.
+// The Product Service stores the users IT cares about: sellers.
+enum Role {
+  SELLER
+  BUYER
+}
+
+model User {
+  id        Int       @id @default(autoincrement())
+  name      String
+  role      Role      @default(BUYER)
+  createdAt DateTime  @default(now())
+  // one user can own many products
+  products  Product[]
+}
+
+// A product is something a seller offers for sale.
+model Product {
+  id        Int      @id @default(autoincrement())
+  sellerId  Int
+  // foreign key: sellerId must reference an existing User
+  seller    User     @relation(fields: [sellerId], references: [id])
+  name      String
+  // Decimal(10,2) = up to 10 digits, 2 after the comma (money!)
+  price     Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now())
+}

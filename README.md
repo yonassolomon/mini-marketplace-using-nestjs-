@@ -311,6 +311,22 @@ Client → API Gateway → Order Controller → Order Service → Prisma → Pos
   curl localhost:3001/products
   curl localhost:3001/products/seller/1
   ```
+- [x] **Phase 3** — Order Service (same patterns, new domain).
+
+  **Try it yourself (Phase 3):**
+  ```bash
+  cd services/orders
+  npx prisma migrate dev --name init
+  npm run start:dev                    # http://localhost:3002
+  ```
+  ```bash
+  # Create a buyer, then an order, then confirm it:
+  curl -X POST localhost:3002/users -H "Content-Type: application/json" -d '{"name":"Bob","role":"BUYER"}'
+  curl -X POST localhost:3002/orders -H "Content-Type: application/json" -d '{"buyerId":1,"productId":1,"quantity":2}'
+  curl localhost:3002/orders
+  curl -X POST localhost:3002/orders/1/confirm
+  curl localhost:3002/orders/buyer/1
+  ```
 - [ ] **Phase 3** — Order Service (same patterns, new domain).
 - [ ] **Phase 4** — RabbitMQ: Order Service publishes, Notification Service consumes.
 - [ ] **Phase 5** — Docker: Dockerfiles + `docker-compose.yml` (PostgreSQL, RabbitMQ, 4 services).

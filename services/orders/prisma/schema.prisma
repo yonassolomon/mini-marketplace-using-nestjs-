@@ -1,0 +1,61 @@
+// ============================================================
+// Prisma schema — Order Service database
+//
+// 1. Purpose: defines the models (User, Order) and the connection
+//    for THIS service's own database (marketplace_orders).
+// 2. Called by: the Prisma CLI (npx prisma migrate/generate).
+// 3. Calls: PostgreSQL (to create tables).
+// 4. Communication: Database query (only via the CLI).
+// 5. Why it exists: schema-first ORM — one file describes the
+//    data, Prisma generates migrations + TypeScript types.
+//
+// NEW LESSON — look at Order.productId below:
+// productId is a plain Int, NOT a foreign key. The Product table
+// lives in the PRODUCT SERVICE's database. Microservices never
+// share databases, so Order Service stores only the product's id
+// as a "reference" — like writing someone's phone number on a
+// note without owning their phone book. Real systems verify such
+// references via service-to-service calls or event-driven checks.
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Users again — but this service cares about BUYERS.
+enum Role {
+  SELLER
+  BUYER
+}
+
+// The status lifecycle of an order.
+enum OrderStatus {
+  PENDING // created, not yet confirmed
+  CONFIRMED // confirmed (we add this via POST /orders/:id/confirm)
+}
+
+model User {
+  id        Int       @id @default(autoincrement())
+  name      String
+  role      Role      @default(BUYER)
+  createdAt DateTime  @default(now())
+  // one buyer can place many orders
+  orders    Order[]
+}
+
+model Order {
+  id        Int         @id @default(autoincrement())
+  buyerId   Int
+  // foreign key: buyerId must reference an existing User
+  buyer     User        @relation(fields: [buyerId], references: [id])
+  // NOT a foreign key! (see header comment above)
+  productId Int
+  quantity  Int
+  status    OrderStatus @default(PENDING)
+  createdAt DateTime    @default(now())
+}

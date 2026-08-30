@@ -167,8 +167,10 @@ mini-marketplace/
 │
 ├── README.md                     ← you are here (the map)
 ├── docker-compose.yml            ← Phase 5: starts everything with one command
+├── db/
+│   └── init.sql                  ← creates the two databases on postgres first boot
 │
-├── gateway/                      ← SERVICE 1 — API Gateway
+├── gateway/                      ← SERVICE 1 — API Gateway (no logic, only forwarding)
 │   ├── Dockerfile
 │   ├── package.json
 │   └── src/
@@ -342,6 +344,30 @@ Client → API Gateway → Order Controller → Order Service → Prisma → Pos
   ```
   > RabbitMQ management UI: http://localhost:15672 (guest/guest) — you can watch
   > the `orders_queue` grow and drain live.
+- [x] **Phase 5** — Docker: Dockerfiles + `docker-compose.yml`.
+
+  **Try it yourself (Phase 5):**
+  ```bash
+  docker compose up --build     # builds the 4 images, starts everything
+  docker compose ps             # see container states
+  docker compose logs -f orders # follow one service's logs
+  docker compose down -v        # stop AND delete data (volume)
+  ```
+  **After startup, the whole system is alive:**
+  ```bash
+  # 1. Seller + product (through the gateway!)
+  curl -X POST localhost:3001/users -H "Content-Type: application/json" -d '{"name":"Alice","role":"SELLER"}'
+  curl -X POST localhost:3000/products -H "Content-Type: application/json" -d '{"sellerId":1,"name":"Keyboard","price":49.99}'
+  # 2. Buyer + order (order service publishes to RabbitMQ automatically)
+  curl -X POST localhost:3002/users -H "Content-Type: application/json" -d '{"name":"Bob","role":"BUYER"}'
+  curl -X POST localhost:3000/orders -H "Content-Type: application/json" -d '{"buyerId":1,"productId":1,"quantity":2}'
+  # 3. The notification service consumed the event:
+  curl localhost:3003/notifications
+  ```
+  > **Docker concepts** (image, container, volume, network, port mapping) are
+  > explained as comments inside `docker-compose.yml` — read that file top to bottom.
+  > NOTE: RabbitMQ credentials inside Docker are `admin/admin` (guest/guest only
+  > works from localhost), and migrations run automatically at container start.
 - [ ] **Phase 3** — Order Service (same patterns, new domain).
 - [ ] **Phase 4** — RabbitMQ: Order Service publishes, Notification Service consumes.
 - [ ] **Phase 5** — Docker: Dockerfiles + `docker-compose.yml` (PostgreSQL, RabbitMQ, 4 services).

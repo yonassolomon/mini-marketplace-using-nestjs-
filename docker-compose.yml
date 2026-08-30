@@ -1,0 +1,149 @@
+# ============================================================
+# docker-compose.yml — the ONE command that starts everything
+#
+# KEY DOCKER CONCEPTS (the 5 you must know):
+#
+# 1. IMAGE   — a read-only blueprint (e.g. postgres:16-alpine).
+#              Our services are built from their Dockerfiles
+#              (`build: ./services/products`).
+# 2. CONTAINER — a running instance of an image. Each `service:`
+#              block produces one container.
+# 3. VOLUME  — a persistent storage area OUTSIDE the container.
+#              Containers are ephemeral: `docker compose down`
+#              deletes them, but `pgdata` keeps the database data
+#              alive. Without a volume, your data dies with the
+#              container.
+# 4. NETWORK — containers on the same network can reach each
+#              other by SERVICE NAME: inside this file, the
+#              gateway calls `http://products:3001` — Docker's
+#              DNS resolves `products` to the container's IP.
+# 5. PORT MAPPING — "HOST:CONTAINER". `3000:3000` publishes the
+#              container's port 3000 on your machine. Services
+#              NOT mapped are still reachable on the network by
+#              their names, just not from your browser.
+#
+# OTHER KEY IDEAS:
+# - healthcheck: lets other services wait until a dependency is
+#   REALLY ready (depends_on + condition: service_healthy).
+# - RabbitMQ's guest/guest user only works from localhost, so we
+#   create admin/admin for the containers (see RABBITMQ_DEFAULT_*).
+# ============================================================
+
+name: mini-marketplace
+
+services:
+  # ---------------- INFRASTRUCTURE ----------------
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: marketplace-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      # host 5432 -> container 5432 (local psql keeps working)
+      - "5432:5432"
+    volumes:
+      # named volume: the DB files survive container restarts
+      - pgdata:/var/lib/postgresql/data
+      # init script: creates marketplace_products + marketplace_orders
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      # postgres is "ready" only when it accepts connections
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - marketplace
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: marketplace-rabbitmq
+    environment:
+      # guest/guest only works from localhost — create our own user
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    ports:
+      - "5672:5672"   # AMQP (the protocol our services use)
+      - "15672:15672" # management UI (http://localhost:15672)
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - marketplace
+
+  # ---------------- MICROSERVICES ----------------
+
+  gateway:
+    build: ./gateway
+    container_name: marketplace-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      # service names (not localhost!) — Docker DNS resolves them
+      PRODUCT_SERVICE_URL: http://products:3001
+      ORDER_SERVICE_URL: http://orders:3002
+    depends_on:
+      - products
+      - orders
+    networks:
+      - marketplace
+
+  products:
+    build: ./services/products
+    container_name: marketplace-products
+    ports:
+      - "3001:3001" # mapped too, so you can curl services directly
+    environment:
+      PORT: 3001
+      # host = postgres (the container name), db = its own database
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/marketplace_products?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - marketplace
+
+  orders:
+    build: ./services/orders
+    container_name: marketplace-orders
+    ports:
+      - "3002:3002"
+    environment:
+      PORT: 3002
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/marketplace_orders?schema=public
+      # admin/admin — the user we created for the containers
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - marketplace
+
+  notifications:
+    build: ./services/notifications
+    container_name: marketplace-notifications
+    ports:
+      - "3003:3003"
+    environment:
+      PORT: 3003
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - marketplace
+
+# ---------------- DECLARATIONS ----------------
+volumes:
+  pgdata: # named volume — data lives here, not in the container
+
+networks:
+  marketplace: # one network: every service can reach every other by name
+    driver: bridge

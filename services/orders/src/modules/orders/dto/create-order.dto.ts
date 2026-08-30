@@ -16,16 +16,16 @@ import { IsInt, Min } from 'class-validator';
 export class CreateOrderDto {
   // who is buying (must be a BUYER — checked in the service)
   @IsInt()
-  buyerId: number;
+  buyerId!: number;
 
   // WHICH product. Note: we do NOT validate that this product
   // exists — the product lives in another service's database
   // (the microservices limitation explained in schema.prisma).
   @IsInt()
-  productId: number;
+  productId!: number;
 
   // how many units (at least 1)
   @IsInt()
   @Min(1)
-  quantity: number;
+  quantity!: number;
 }

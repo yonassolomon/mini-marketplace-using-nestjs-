@@ -19,9 +19,9 @@ import { Role } from '@prisma/client'; // reuse the enum defined in schema.prism
 export class CreateUserDto {
   @IsString()
   @IsNotEmpty()
-  name: string;
+  name!: string;
 
   // @IsEnum checks that `role` is one of SELLER or BUYER
   @IsEnum(Role)
-  role: Role;
+  role!: Role;
 }

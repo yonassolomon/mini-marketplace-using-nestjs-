@@ -14,14 +14,21 @@
 //    - only PENDING orders can be confirmed
 // ============================================================
 
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ClientProxy } from '@nestjs/microservices';
 import { OrderStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { OrderCreatedEvent } from './order-created.event';
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    // @Inject('RABBITMQ_CLIENT') asks NestJS for the client proxy
+    // that RabbitMQModule registered. We can now SEND messages.
+    @Inject('RABBITMQ_CLIENT') private readonly rmqClient: ClientProxy,
+  ) {}
 
   // Place a new order.
   async create(dto: CreateOrderDto) {
@@ -37,10 +44,31 @@ export class OrdersService {
     }
 
     // status is NOT in the DTO -> Prisma uses the schema default PENDING.
-    const order = await this.prisma.order.create({ data: dto });
+    // include: { buyer: true } also loads the buyer row (we need the name).
+    const order = await this.prisma.order.create({
+      data: dto,
+      include: { buyer: true },
+    });
 
-    // PHASE 4: the RabbitMQ publisher call will go right here,
-    // after the order is safely in the database.
+    // ===== ASYNCHRONOUS COMMUNICATION =====
+    // Publish the event so OTHER services can react (notification!).
+    // emit() = "fire and forget": the order is already saved, we do
+    // not wait for any consumer. RabbitMQ holds the message safely
+    // until the Notification Service picks it up.
+    // (send() would be the synchronous variant: it WAITS for a reply.)
+    this.rmqClient.emit(
+      'order.created', // the event name / pattern
+      new OrderCreatedEvent(
+        order.id,
+        order.buyerId,
+        order.buyer.name,
+        order.productId,
+        order.quantity,
+        order.status,
+        order.createdAt,
+      ),
+    );
+    console.log(`[OrdersService] published order.created for order #${order.id}`);
 
     return order;
   }

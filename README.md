@@ -327,6 +327,21 @@ Client → API Gateway → Order Controller → Order Service → Prisma → Pos
   curl -X POST localhost:3002/orders/1/confirm
   curl localhost:3002/orders/buyer/1
   ```
+- [x] **Phase 4** — RabbitMQ: Order Service publishes, Notification Service consumes.
+
+  **Try it yourself (Phase 4):**
+  ```bash
+  # 1. Start RabbitMQ (Docker: docker run -d -p 5672:5672 -p 15672:15672 rabbitmq:3-management)
+  # 2. Order service: cd services/orders && npm run start:dev   (port 3002)
+  # 3. Notification service: cd services/notifications && npm run start:dev  (port 3003)
+  ```
+  ```bash
+  curl -X POST localhost:3002/users -H "Content-Type: application/json" -d '{"name":"Bob","role":"BUYER"}'
+  curl -X POST localhost:3002/orders -H "Content-Type: application/json" -d '{"buyerId":1,"productId":1,"quantity":2}'
+  curl localhost:3003/notifications   # see the consumed event!
+  ```
+  > RabbitMQ management UI: http://localhost:15672 (guest/guest) — you can watch
+  > the `orders_queue` grow and drain live.
 - [ ] **Phase 3** — Order Service (same patterns, new domain).
 - [ ] **Phase 4** — RabbitMQ: Order Service publishes, Notification Service consumes.
 - [ ] **Phase 5** — Docker: Dockerfiles + `docker-compose.yml` (PostgreSQL, RabbitMQ, 4 services).

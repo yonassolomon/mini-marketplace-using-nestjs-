@@ -17,8 +17,8 @@ import { Role } from '@prisma/client';
 export class CreateUserDto {
   @IsString()
   @IsNotEmpty()
-  name: string;
+  name!: string;
 
   @IsEnum(Role)
-  role: Role;
+  role!: Role;
 }

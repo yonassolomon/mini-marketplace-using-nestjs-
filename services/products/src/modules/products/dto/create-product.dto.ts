@@ -15,15 +15,17 @@ import { IsInt, IsNotEmpty, IsNumber, IsPositive, IsString } from 'class-validat
 
 export class CreateProductDto {
   // sellerId must be an existing user id (validated in service)
+  // `!` = "definitely assigned": the ValidationPipe instantiates
+  // this class via class-transformer, which assigns the value.
   @IsInt()
-  sellerId: number;
+  sellerId!: number;
 
   @IsString()
   @IsNotEmpty()
-  name: string;
+  name!: string;
 
   // money: must be a positive number, max 2 decimals
   @IsNumber({ maxDecimalPlaces: 2 })
   @IsPositive()
-  price: number;
+  price!: number;
 }

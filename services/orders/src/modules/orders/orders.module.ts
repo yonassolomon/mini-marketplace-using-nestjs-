@@ -13,11 +13,14 @@
 
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { RabbitMQModule } from '../../rabbitmq/rabbitmq.module';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 
 @Module({
-  imports: [PrismaModule],
+  // RabbitMQModule provides the 'RABBITMQ_CLIENT' that
+  // OrdersService injects to publish events.
+  imports: [PrismaModule, RabbitMQModule],
   controllers: [OrdersController],
   providers: [OrdersService],
 })
